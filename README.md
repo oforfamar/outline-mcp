@@ -29,6 +29,13 @@ Server endpoints:
 - MCP: `http://localhost:3000/mcp`
 - Health: `http://localhost:3000/health`
 
+Notes:
+
+- This server uses MCP Streamable HTTP transport (not stdio).
+- MCP requests to `/mcp` must include:
+  - `Content-Type: application/json`
+  - `Accept: application/json, text/event-stream`
+
 ## Docker Run
 
 ```bash
@@ -62,6 +69,59 @@ Run it with:
 
 ```bash
 docker compose up --build
+```
+
+## Quick MCP Check with curl
+
+Health check:
+
+```bash
+curl -sS http://localhost:3000/health
+```
+
+Initialize MCP session:
+
+```bash
+curl -sS -X POST http://localhost:3000/mcp \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -d '{
+    "jsonrpc":"2.0",
+    "id":"init-1",
+    "method":"initialize",
+    "params":{
+      "protocolVersion":"2025-03-26",
+      "capabilities":{},
+      "clientInfo":{"name":"curl","version":"1.0.0"}
+    }
+  }'
+```
+
+Send initialized notification:
+
+```bash
+curl -sS -X POST http://localhost:3000/mcp \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -d '{
+    "jsonrpc":"2.0",
+    "method":"notifications/initialized",
+    "params":{}
+  }'
+```
+
+List available tools:
+
+```bash
+curl -sS -X POST http://localhost:3000/mcp \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -d '{
+    "jsonrpc":"2.0",
+    "id":"tools-1",
+    "method":"tools/list",
+    "params":{}
+  }'
 ```
 
 ## OpenWebUI Setup
