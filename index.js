@@ -15,11 +15,12 @@ if (!outlineUrl || !outlineToken) {
 const OUTLINE_URL = outlineUrl.replace(/\/$/, "");
 const OUTLINE_TOKEN = outlineToken;
 
-function formatToolResult(value) {
+function formatToolResult(value, isError = false) {
   const text =
     typeof value === "string" ? value : JSON.stringify(value, null, 2);
   return {
     content: [{ type: "text", text }],
+    ...(isError ? { isError: true } : {}),
   };
 }
 
@@ -84,18 +85,22 @@ server.registerTool(
   {
     description: "Search Outline documents by query",
     inputSchema: {
-      query: z.string().min(1),
+      query: z.string().min(1).describe("The search query"),
+      collectionId: z.string().optional().describe("Optional collection ID to restrict the search"),
     },
   },
-  async ({ query }) => {
+  async ({ query, collectionId }) => {
     try {
       if (!query || !query.trim()) {
         throw new Error("Parameter 'query' is required");
       }
 
-      const data = await callOutline("documents.search", {
-        query: query.trim(),
-      });
+      const payload = { query: query.trim() };
+      if (collectionId?.trim()) {
+        payload.collectionId = collectionId.trim();
+      }
+
+      const data = await callOutline("documents.search", payload);
       const documents = Array.isArray(data)
         ? data
         : Array.isArray(data?.documents)
@@ -111,7 +116,7 @@ server.registerTool(
       return formatToolResult(result);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error";
-      return formatToolResult(`Error: ${message}`);
+      return formatToolResult(`Error: ${message}`, true);
     }
   },
 );
@@ -121,7 +126,7 @@ server.registerTool(
   {
     description: "Get an Outline document by id",
     inputSchema: {
-      id: z.string().min(1),
+      id: z.string().min(1).describe("The ID of the document to retrieve"),
     },
   },
   async ({ id }) => {
@@ -141,7 +146,7 @@ server.registerTool(
       return formatToolResult(result);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error";
-      return formatToolResult(`Error: ${message}`);
+      return formatToolResult(`Error: ${message}`, true);
     }
   },
 );
@@ -151,12 +156,13 @@ server.registerTool(
   {
     description: "Create and publish a new Outline document",
     inputSchema: {
-      title: z.string().min(1),
-      text: z.string().min(1),
-      collectionId: z.string().min(1),
+      title: z.string().min(1).describe("The title of the new document"),
+      text: z.string().min(1).describe("The markdown content of the document"),
+      collectionId: z.string().min(1).describe("The ID of the collection to place the document in"),
+      publish: z.boolean().optional().describe("Whether to publish the document (default: true)"),
     },
   },
-  async ({ title, text, collectionId }) => {
+  async ({ title, text, collectionId, publish = true }) => {
     try {
       if (!title?.trim()) {
         throw new Error("Parameter 'title' is required");
@@ -174,13 +180,13 @@ server.registerTool(
         title: title.trim(),
         text,
         collectionId: collectionId.trim(),
-        publish: true,
+        publish,
       });
 
       return formatToolResult(`Created: ${data?.url ?? "(no url returned)"}`);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error";
-      return formatToolResult(`Error: ${message}`);
+      return formatToolResult(`Error: ${message}`, true);
     }
   },
 );
@@ -190,12 +196,13 @@ server.registerTool(
   {
     description: "Update an existing Outline document",
     inputSchema: {
-      id: z.string().min(1),
-      title: z.string().optional(),
-      text: z.string().optional(),
+      id: z.string().min(1).describe("The ID of the document to update"),
+      title: z.string().optional().describe("The new title of the document"),
+      text: z.string().optional().describe("The new markdown content of the document"),
+      append: z.boolean().optional().describe("If true, appends text to the end of the document instead of replacing it"),
     },
   },
-  async ({ id, title, text }) => {
+  async ({ id, title, text, append }) => {
     try {
       if (!id?.trim()) {
         throw new Error("Parameter 'id' is required");
@@ -216,13 +223,16 @@ server.registerTool(
 
       if (hasText) {
         payload.text = text;
+        if (append) {
+          payload.append = true;
+        }
       }
 
       const data = await callOutline("documents.update", payload);
       return formatToolResult(`Updated: ${data?.url ?? "(no url returned)"}`);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error";
-      return formatToolResult(`Error: ${message}`);
+      return formatToolResult(`Error: ${message}`, true);
     }
   },
 );
@@ -230,11 +240,19 @@ server.registerTool(
 server.registerTool(
   "list_collections",
   {
-    description: "List Outline collections",
+    description: "List Outline collections. Collections are top-level workspaces.",
+    inputSchema: {
+      offset: z.number().optional().describe("Pagination offset"),
+      limit: z.number().optional().describe("Pagination limit (default: 25)"),
+    },
   },
-  async () => {
+  async ({ offset, limit }) => {
     try {
-      const data = await callOutline("collections.list", {});
+      const payload = {};
+      if (offset !== undefined) payload.offset = offset;
+      if (limit !== undefined) payload.limit = limit;
+
+      const data = await callOutline("collections.list", payload);
       const collections = Array.isArray(data)
         ? data
         : Array.isArray(data?.collections)
@@ -250,7 +268,7 @@ server.registerTool(
       return formatToolResult(result);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error";
-      return formatToolResult(`Error: ${message}`);
+      return formatToolResult(`Error: ${message}`, true);
     }
   },
 );
