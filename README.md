@@ -1,6 +1,7 @@
 # outline-mcp
 
 Minimal MCP server for Outline using Node.js 24+, native `fetch`, and Streamable HTTP transport.
+Designed to be run directly or behind MCPO for OpenWebUI OpenAPI integration.
 
 ## Requirements
 
@@ -126,6 +127,13 @@ curl -sS -X POST http://localhost:3000/mcp \
 
 ## OpenWebUI Setup
 
+You can integrate this server with OpenWebUI in two ways:
+
+1. Direct MCP HTTP endpoint (no MCPO)
+2. MCPO sidecar that exposes an OpenAPI endpoint for OpenWebUI
+
+### Option A: Direct MCP endpoint
+
 Add this server in OpenWebUI as an MCP HTTP endpoint:
 
 - URL: `http://<host-or-container-ip>:3000/mcp`
@@ -136,12 +144,30 @@ If OpenWebUI runs in Docker on the same host, use one of:
 - `http://host.docker.internal:3000/mcp` (Docker Desktop)
 - `http://<docker-host-ip>:3000/mcp` (Linux)
 
+### Option B: MCPO sidecar (OpenAPI endpoint)
+
+Run `outline-mcp` as-is, then run MCPO as a sidecar and point MCPO to:
+
+- `http://outline-mcp:3000/mcp` (inside Docker network), or
+- `http://host.docker.internal:3000/mcp` / host IP (from another container)
+
+Then configure OpenWebUI to use the MCPO OpenAPI URL.
+
+Important: MCPO CLIs/images differ by version. Use your MCPO build's documented flags/options for:
+
+- MCP upstream URL
+- OpenAPI bind host/port
+- Any auth or CORS settings required by your OpenWebUI deployment
+
+If your MCPO build does not support MCP HTTP upstream, this project must be converted to a stdio MCP entrypoint before MCPO can wrap it.
+
 ## Tools
 
 - `search_documents`
 - `get_document`
 - `create_document`
 - `update_document`
+- `delete_document`
 - `list_collections`
 
 ## Security

@@ -264,6 +264,39 @@ function createOutlineMcpServer() {
   );
 
   server.registerTool(
+    "delete_document",
+    {
+      description: "Delete an Outline document by id",
+      inputSchema: {
+        id: z.string().min(1).describe("The ID of the document to delete"),
+        permanent: z
+          .boolean()
+          .optional()
+          .describe("If true, permanently delete instead of soft-delete"),
+      },
+    },
+    async ({ id, permanent }) => {
+      try {
+        if (!id?.trim()) {
+          throw new Error("Parameter 'id' is required");
+        }
+
+        const payload = { id: id.trim() };
+        if (typeof permanent === "boolean") {
+          payload.permanent = permanent;
+        }
+
+        await callOutline("documents.delete", payload);
+        return formatToolResult(`Deleted: ${id.trim()}`);
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : "Unknown error";
+        return formatToolResult(`Error: ${message}`, true);
+      }
+    },
+  );
+
+  server.registerTool(
     "list_collections",
     {
       description:
